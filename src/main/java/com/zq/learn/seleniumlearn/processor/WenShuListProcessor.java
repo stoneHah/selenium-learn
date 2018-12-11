@@ -16,6 +16,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+
 /**
  * ${DESCRIPTION}
  *
@@ -23,13 +24,16 @@ import java.util.Map;
  * @create 2018/12/10
  **/
 public class WenShuListProcessor implements PageProcessor{
-    private Site site = Site.me().setRetryTimes(3).setSleepTime(1000);
+    private Site site = Site.me().setRetryTimes(3)
+            .setCycleRetryTimes(3)
+            .setTimeOut(10000).setSleepTime(1000);
 
     @Override
     public void process(Page page) {
         String rawText = page.getRawText();
         if (StringUtils.hasText(rawText)) {
-            rawText = rawText.substring(1, rawText.length() - 2);
+            rawText = rawText.substring(1, rawText.length() - 1)
+                        .replaceAll("\\\\\"","\"");
             page.setRawText(rawText);
 
             Json json = page.getJson();
