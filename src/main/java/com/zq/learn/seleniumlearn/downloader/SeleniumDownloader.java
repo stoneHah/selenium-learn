@@ -1,9 +1,13 @@
 package com.zq.learn.seleniumlearn.downloader;
 
 import com.zq.learn.seleniumlearn.action.SeleniumAction;
+import com.zq.learn.seleniumlearn.downloader.rule.RequestMathRule;
 import com.zq.learn.seleniumlearn.util.WindowUtil;
 import org.apache.log4j.Logger;
 import org.openqa.selenium.*;
+import org.openqa.selenium.support.ui.ExpectedCondition;
+import org.openqa.selenium.support.ui.ExpectedConditions;
+import org.openqa.selenium.support.ui.WebDriverWait;
 import us.codecraft.webmagic.Page;
 import us.codecraft.webmagic.Request;
 import us.codecraft.webmagic.Site;
@@ -14,7 +18,10 @@ import us.codecraft.webmagic.selector.PlainText;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
+import java.util.Map.Entry;
 
 /**
  * 使用Selenium调用浏览器进行渲染。目前仅支持chrome。<br>
@@ -34,7 +41,11 @@ public class SeleniumDownloader implements Downloader, Closeable {
 
 	private int poolSize = 1;
 
-	private static final String DRIVER_PHANTOMJS = "phantomjs";
+	/**
+	 * 默认资源等待时间
+	 */
+	private int defaultReourceWaitTime = 60;
+	private Map<RequestMathRule, ExpectedCondition> resourceExpectedConditionMap = new HashMap<>();
 
 	/**
 	 * 新建
@@ -67,6 +78,14 @@ public class SeleniumDownloader implements Downloader, Closeable {
 		return this;
 	}
 
+	public void setDefaultReourceWaitTime(int defaultReourceWaitTime) {
+		this.defaultReourceWaitTime = defaultReourceWaitTime;
+	}
+
+	public void addExpectedCondition(RequestMathRule rule,ExpectedCondition cond){
+		resourceExpectedConditionMap.put(rule, cond);
+	}
+
 	@Override
 	public Page download(Request request, Task task) {
 		checkInit();
@@ -79,11 +98,10 @@ public class SeleniumDownloader implements Downloader, Closeable {
 		}
 		logger.info("downloading page " + request.getUrl());
 		webDriver.get(request.getUrl());
-		try {
-			Thread.sleep(sleepTime);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
+
+		//一直等待，直到资源加载完毕
+		waitUnitResourceLoaded(webDriver,request);
+
 		WebDriver.Options manage = webDriver.manage();
 		Site site = task.getSite();
 		if (site.getCookies() != null) {
@@ -122,6 +140,36 @@ public class SeleniumDownloader implements Downloader, Closeable {
 		page.setRequest(request);
 		webDriverPool.returnToPool(webDriver);
 		return page;
+	}
+
+	/**
+	 * 等待资源，直到加载完毕
+	 * @param webDriver
+	 * @param request
+	 */
+	private void waitUnitResourceLoaded(WebDriver webDriver, Request request) {
+		boolean matchRule = false;
+		Iterator<Entry<RequestMathRule, ExpectedCondition>> iterator = resourceExpectedConditionMap.entrySet().iterator();
+		while (iterator.hasNext()) {
+			Entry<RequestMathRule, ExpectedCondition> entry = iterator.next();
+			if(entry.getKey().match(request)){
+				matchRule = true;
+				try {
+					(new WebDriverWait(webDriver, defaultReourceWaitTime)).until(entry.getValue());
+				} catch (TimeoutException e) {
+					e.printStackTrace();
+				}
+				break;
+			}
+		}
+
+		if(!matchRule){
+			try {
+				Thread.sleep(sleepTime);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+		}
 	}
 
 	private void checkInit() {

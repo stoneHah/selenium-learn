@@ -1,0 +1,4 @@
+webdriver:
+  chrome:
+    driver: F:\\spider\\driver\\chromedriver.exe
+#    driver: /Users/bianweiping/Documents/spider/driver/chromedriver
